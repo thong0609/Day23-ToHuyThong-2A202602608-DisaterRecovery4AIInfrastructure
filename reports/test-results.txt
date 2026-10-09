@@ -1,0 +1,25 @@
+============================= test session starts ==============================
+platform linux -- Python 3.14.6, pytest-8.3.4, pluggy-1.6.0 -- /tmp/lab23-venv/bin/python3
+cachedir: .pytest_cache
+rootdir: /mnt/d/Day23-ToHuyThong-2A202602608-DisaterRecovery4AIInfrastructure/run/verification
+plugins: anyio-4.15.1
+collecting ... collected 16 items
+
+tests/test_failover.py::test_rpo_dem_dung_so_doc_bi_mat PASSED           [  6%]
+tests/test_failover.py::test_health_checker_can_threshold_lien_tiep PASSED [ 12%]
+tests/test_failover.py::test_failover_khong_cutover_khi_target_chua_ready PASSED [ 18%]
+tests/test_rto_evidence.py::test_drill1_ton_tai_va_khong_phuc_hoi PASSED [ 25%]
+tests/test_rto_evidence.py::test_drill2_hop_le PASSED                    [ 31%]
+tests/test_rto_evidence.py::test_rto_do_duoc_bang_timestamp PASSED       [ 37%]
+tests/test_rto_evidence.py::test_health_check_interval_duoc_ghi_lai PASSED [ 43%]
+tests/test_rto_evidence.py::test_rpo_duoc_do_chu_khong_uoc_luong PASSED  [ 50%]
+tests/test_rto_evidence.py::test_evidence_table_tro_vao_file_that PASSED [ 56%]
+tests/test_rto_evidence.py::test_chaos_khong_giet_ca_hai_region PASSED   [ 62%]
+tests/test_rto_evidence.py::test_evidence_table_da_dien_that PASSED      [ 68%]
+tests/test_rto_evidence.py::test_so_trong_bang_khop_voi_so_trong_log PASSED [ 75%]
+tests/test_rto_evidence.py::test_postmortem_co_gap_analysis PASSED       [ 81%]
+dr/test_runbook.py::test_runbook_calls_failover_once_and_records_seven_steps PASSED [ 87%]
+dr/test_runbook.py::test_confirmation_defaults_to_no PASSED              [ 93%]
+dr/test_runbook.py::test_healthy_primary_aborts_before_failover PASSED   [100%]
+
+============================== 16 passed in 2.59s ==============================

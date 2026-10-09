@@ -36,12 +36,65 @@ LOG = pathlib.Path("reports/failover-events.jsonl")
 
 def emit(**kw):
     """TODO: append 1 dòng JSONL có ts + iso vào LOG, và print ra stdout."""
-    raise NotImplementedError
+    rec = dict(ts=time.time(), iso=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), **kw)
+    LOG.parent.mkdir(parents=True, exist_ok=True)
+    with LOG.open("a", encoding="utf-8") as log:
+        log.write(json.dumps(rec) + "\n")
+    print(json.dumps(rec), flush=True)
+
+
+def state_of(region):
+    response = httpx.get(f"{URL[region]}/v1/state", timeout=2)
+    response.raise_for_status()
+    return response.json()
 
 
 def failover(target: str, backend: str, wait: float) -> dict:
     """TODO: 5 bước ở trên, đúng thứ tự."""
-    raise NotImplementedError
+    if target not in URL or backend not in ("fs", "minio") or wait <= 0:
+        raise ValueError("Invalid failover configuration")
+    current_step = "1_verify_target"
+    try:
+        initial = state_of(target)
+        emit(step=current_step, target=target, state=initial)
+        current_step = "2_restore_snapshot"
+        started = time.monotonic()
+        meta = snapshot.get(target, backend)
+        source = meta.get("source_region", "a" if target == "b" else "b")
+        loss = snapshot.rpo(pathlib.Path(f"state/region-{source}/vectors.sqlite"),
+                            pathlib.Path(f"state/region-{target}/vectors.sqlite"))
+        emit(step=current_step, target=target, **loss,
+             embed_model_version=meta["embed_model_version"],
+             duration_s=time.monotonic() - started)
+        current_step = "3_scale_pool"
+        pathlib.Path(f"state/region-{target}/pool_state").write_text("full", encoding="utf-8")
+        emit(step=current_step, target=target)
+        current_step = "4_wait_ready"
+        started = time.monotonic()
+        deadline = started + wait
+        while time.monotonic() < deadline:
+            try:
+                response = httpx.get(f"{URL[target]}/readyz",
+                                     timeout=min(2, max(0.01, deadline - time.monotonic())))
+                if response.status_code == 200:
+                    break
+            except httpx.HTTPError:
+                pass
+            time.sleep(min(0.25, max(0, deadline - time.monotonic())))
+        else:
+            raise TimeoutError("Target did not become ready; cutover aborted")
+        emit(step=current_step, target=target, waited_s=time.monotonic() - started)
+        final_state = state_of(target)
+        current_step = "5_dns_cutover"
+        pointer = pathlib.Path("edge/active_region")
+        temporary = pointer.with_suffix(".tmp")
+        temporary.write_text(target, encoding="utf-8")
+        temporary.replace(pointer)
+        emit(step=current_step, target=target, ok=True)
+        return dict(ok=True, target=target, state=final_state, **loss)
+    except (Exception, SystemExit) as exc:
+        emit(event="abort", failed_step=current_step, target=target, reason=str(exc))
+        return dict(ok=False, target=target, failed_step=current_step, reason=str(exc))
 
 
 if __name__ == "__main__":
@@ -50,4 +103,6 @@ if __name__ == "__main__":
     p.add_argument("--backend", default="fs", choices=["fs", "minio"])
     p.add_argument("--wait", type=float, default=60)
     a = p.parse_args()
-    print(json.dumps(failover(a.target, a.backend, a.wait), indent=2))
+    result = failover(a.target, a.backend, a.wait)
+    print(json.dumps(result, indent=2))
+    raise SystemExit(0 if result.get("ok") else 1)
